@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { UsersList } from './components/UsersList';
-import { SortBy, type User } from './types.d';
+import { SortBy, User } from './types.d';
+
+function debounce<T extends any[]>(func: (...args: T) => void, delay: number) {
+  let timeoutId: NodeJS.Timeout;
+
+  return function(this: any, ...args: T) {
+    const context = this;
+
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      func.apply(context, args);
+    }, delay);
+  };
+}
 
 function App() {
   const [users, setUsers] = useState<User[]>([]);
@@ -10,9 +23,6 @@ function App() {
   const [filterCountry, setFilterCountry] = useState<string | null>(null);
 
   const originalUsers = useRef<User[]>([]);
-  // useRef -> para guardar un valor
-  // que queremos que se comparta entre renderizados
-  // pero que al cambiar, no vuelva a renderizar el componente
 
   const toggleColors = () => {
     setShowColors(!showColors);
@@ -65,36 +75,22 @@ function App() {
 
     if (sorting === SortBy.NONE) return filteredUsers;
 
-    const compareProperties: Record<string, (user: User) => any> = {
+    const compareProperties: Record<SortBy, (user: User) => string> = {
       [SortBy.COUNTRY]: (user) => user.location.country,
       [SortBy.NAME]: (user) => user.name.first,
       [SortBy.LAST]: (user) => user.name.last,
     };
 
-    return filteredUsers.toSorted((a, b) => {
+    return [...filteredUsers].sort((a, b) => {
       const extractProperty = compareProperties[sorting];
       return extractProperty(a).localeCompare(extractProperty(b));
     });
   }, [filteredUsers, sorting]);
 
-  // const filteredUsers = (() => {
-  //   console.log('calculate filteredUsers')
-  //   return filterCountry != null && filterCountry.length > 0
-  //     ? users.filter(user => {
-  //       return user.location.country.toLowerCase().includes(filterCountry.toLowerCase())
-  //     })
-  //     : users
-  // })()
-
-  // const sortedUsers = (() => {
-  //   console.log('calculate sortedUsers')
-
-  //   return sortByCountry
-  //     ? filteredUsers.toSorted(
-  //       (a, b) => a.location.country.localeCompare(b.location.country)
-  //     )
-  //     : filteredUsers
-  // })()
+  const debouncedSetFilterCountry = useMemo(
+    () => debounce((value: string) => setFilterCountry(value), 500),
+    []
+  );
 
   return (
     <div className="App">
@@ -113,7 +109,7 @@ function App() {
         <input
           placeholder="Filtra por país"
           onChange={(e) => {
-            setFilterCountry(e.target.value);
+            debouncedSetFilterCountry(e.target.value);
           }}
         />
       </header>
